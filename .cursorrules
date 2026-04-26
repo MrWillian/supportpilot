@@ -1,0 +1,20 @@
+# SupportPilot - Regras de Desenvolvimento
+
+## Stack Fixa
+- **Runtime:** Node.js 20 + TypeScript Strict.
+- **Framework:** Express com Zod para validação de input.
+- **Fila:** BullMQ (Redis).
+- **IA:** LangChain (`@langchain/openai`). Modelo: GPT-4o-mini (custo baixo para testes).
+
+## Arquitetura do Agente (Imutável)
+1. **Todo agente deve retornar um `TriageResult` tipado (tipo, sentimento, respostaSugerida, confianca).**
+2. **NUNCA chamar a API da OpenAI diretamente.** Usar sempre a camada `services/llm-client.ts` (para facilitar troca de provider futuro).
+3. **Prompt Engineering:** Todos os prompts devem ser armazenados como variáveis exportadas em `prompts/`. Nada de string hardcoded no meio do código.
+
+## Padrões de Segurança e Ética
+- **Sanitização:** Remover CPF, telefone e email dos logs. (Crie uma função `maskPII`).
+- **Moderação:** Antes de salvar a resposta sugerida, passar por um checker de toxicidade básico.
+
+## Testes e Avaliação
+- Cada agente deve ter um **eval set** em `src/agents/**/eval.ts`.
+- Um script `npm run evaluate` que roda os eval sets e gera um relatório de precisão/recall por categoria.
