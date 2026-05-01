@@ -4,6 +4,7 @@ import { classificarTicket } from "../agents/classifier/agent";
 import { redisConnection } from "../config/redis";
 import { PROCESSAR_TICKET_JOB, TRIAGE_QUEUE_NAME } from "../jobs/triage.job";
 import {
+  metricasStore,
   resultadosTriage,
   triageEventBus,
   type TriageCompletedEvent,
@@ -18,8 +19,20 @@ let activeWorker: Worker | null = null;
  * propaga para o BullMQ aplicar retry conforme `defaultJobOptions` da fila.
  */
 export async function runTriageJob(ticket: TicketInput): Promise<ClassifierOutput> {
+  const startedAt = Date.now();
   const out = await classificarTicket(ticket);
+  const durationMs = Date.now() - startedAt;
+
   resultadosTriage.set(ticket.id, out);
+
+  metricasStore.totalTickets += 1;
+  metricasStore.porCategoria[out.categoria] += 1;
+  metricasStore.confiancaMedia =
+    metricasStore.confiancaMedia +
+    (out.confianca - metricasStore.confiancaMedia) / metricasStore.totalTickets;
+  metricasStore.tempoMedioMs =
+    metricasStore.tempoMedioMs +
+    (durationMs - metricasStore.tempoMedioMs) / metricasStore.totalTickets;
 
   const event: TriageCompletedEvent = { id: ticket.id, result: out };
   triageEventBus.emit("completed", event);

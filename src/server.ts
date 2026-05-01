@@ -1,20 +1,46 @@
 import "dotenv/config";
 
+import cors from "cors";
 import express from "express";
 import { z } from "zod";
 
 import { TicketInputSchema } from "./agents/classifier/schema";
 import { PROCESSAR_TICKET_JOB } from "./jobs/triage.job";
-import { resultadosTriage } from "./stores/triage.store";
+import { metricasStore, resultadosTriage } from "./stores/triage.store";
 import { redisConnection, triageQueue } from "./services/queue";
 import { listAllTickets } from "./services/tickets-list";
 import { closeWorker, startWorker } from "./workers/triage.worker";
 
 const app = express();
+
+const corsOrigins = process.env.FRONTEND_ORIGIN
+  ? process.env.FRONTEND_ORIGIN.split(",").map((s) => s.trim())
+  : ["http://localhost:5173", "http://127.0.0.1:5173"];
+
+app.use(
+  cors({
+    origin: corsOrigins,
+  }),
+);
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
+});
+
+app.get("/metrics", (_req, res) => {
+  return res.status(200).json({
+    totalTickets: metricasStore.totalTickets ?? 0,
+    porCategoria: metricasStore.porCategoria ?? {
+      reclamacao: 0,
+      duvida_tecnica: 0,
+      cancelamento: 0,
+      elogio: 0,
+    },
+    confiancaMedia:
+      metricasStore.totalTickets > 0 ? metricasStore.confiancaMedia : 0,
+    tempoMedioMs: metricasStore.totalTickets > 0 ? metricasStore.tempoMedioMs : 0,
+  });
 });
 
 app.post("/tickets", async (req, res) => {
